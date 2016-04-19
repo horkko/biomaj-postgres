@@ -9,7 +9,7 @@ config = {
     'url': 'http://biomaj.genouest.org',
     'download_url': 'http://biomaj.genouest.org',
     'author_email': 'olivier.sallou@irisa.fr',
-    'version': '3.0.14',
+    'version': '3.0.16',
      'classifiers': [
         # How mature is this project? Common values are
         #   3 - Alpha
@@ -32,7 +32,7 @@ config = {
         'Programming Language :: Python :: 3.4'
     ],
     'install_requires': ['nose',
-                            'pymongo==2.7.2',
+                            'pymongo==3.2',
                             'pycurl',
                             'ldap3',
                             'mock',

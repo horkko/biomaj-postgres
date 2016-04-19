@@ -139,7 +139,8 @@ class Session(object):
         Reset status of meta processes
         '''
         if proc in metas:
-            self.reset_process(proc)
+            for metaproc in list(metas[proc].keys()):
+                self.reset_process(metas[proc], metaproc)
         else:
             for meta in list(metas.keys()):
                 self.reset_process(metas[meta], proc)
@@ -166,7 +167,7 @@ class Session(object):
         '''
         Get release directroy name
         '''
-        return self.name+'-'+str(self._session['release'])
+        return self.name+self.config.get('release.separator', default='_')+str(self._session['release'])
 
     def get_full_release_directory(self):
         '''

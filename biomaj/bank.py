@@ -166,10 +166,16 @@ class Bank(object):
                               str(datetime.fromtimestamp(_bank['last_update_session']).strftime("%Y-%m-%d %H:%M:%S")),
                               str(release)])
             # Bank production info header
-            prod_info.append(["Session", "Remote release", "Release", "Directory", "Freeze", "Pending"])
+            prod_info.append(["Session", "Remote release", "Release", "Directory", "Freeze"])
             for prod in _bank['production']:
-                release_dir = os.path.join(self.config.get('data.dir'),
-                                           self.config.get('dir.version'),
+                data_dir = self.config.get('data.dir')
+                dir_version = self.config.get('dir.version')
+                if 'data.dir' in prod:
+                    data_dir = prod['data.dir']
+                if 'dir.version' in prod:
+                    dir_version = prod['dir.version']
+                release_dir = os.path.join(data_dir,
+                                           dir_version,
                                            prod['prod_dir'])
                 date = datetime.fromtimestamp(prod['session']).strftime('%Y-%m-%d %H:%M:%S')
                 prod_info.append([date,
@@ -440,6 +446,14 @@ class Bank(object):
             f_downloaded_files.close()
             self.session.set('download_files',[])
 
+        local_files = self.session.get('files')
+        if local_files is not None:
+            f_local_files = open(os.path.join(cache_dir, 'local_files_'+str(self.session.get('id'))), 'w')
+            f_local_files.write(json.dumps(download_files))
+            f_local_files.close()
+            self.session.set('files',[])
+
+
         self.banks.update({'name': self.name}, {
             '$set': {
                 action: self.session._session['id'],
@@ -520,6 +534,9 @@ class Bank(object):
         # No previous session
         if 'sessions' not in self.bank:
             return
+        if self.config.get_bool('keep.old.sessions'):
+            logging.debug('keep old sessions, skipping...')
+            return
         # 'last_update_session' in self.bank and self.bank['last_update_session']
         old_sessions = []
         prod_releases = []
@@ -546,14 +563,19 @@ class Bank(object):
             for session in old_sessions:
                 session_id = session['id']
                 self.banks.update({'name': self.name}, {'$pull': {'sessions': {'id': session_id}}})
+                # Check if in pending sessions
+                for rel in list(self.bank['pending'].keys()):
+                    rel_session = self.bank['pending'][rel]
+                    if rel_session == session_id:
+                        self.banks.update({'name': self.name}, {'$unset': {'pending': {str(session['release']): ""}}})
                 if session['release'] not in prod_releases and session['release'] != self.session.get('release'):
                     # There might be unfinished releases linked to session, delete them
                     # if they are not related to a production directory or latest run
                     session_dir = os.path.join(self.config.get('data.dir'),
                                                self.config.get('dir.version'),
-                                               self.name + '-' + str(session['release']))
+                                               self.name + self.config.get('release.separator', default='_') + str(session['release']))
                     if os.path.exists(session_dir):
-                        logging.info('Bank:DeleteOldSessionDir:' + self.name + '-' + str(session['release']))
+                        logging.info('Bank:DeleteOldSessionDir:' + self.name + self.config.get('release.separator', default='_') + str(session['release']))
                         shutil.rmtree(session_dir)
             self.bank = self.banks.find_one({'name': self.name})
 
@@ -610,6 +632,7 @@ class Bank(object):
         :type release: str
         :return: production field
         '''
+        release = str(release)
         production = None
         for prod in self.bank['production']:
             if prod['release'] == release or prod['prod_dir'] == release:
@@ -626,6 +649,7 @@ class Bank(object):
         :type release: str
         :return: bool
         '''
+        release = str(release)
         if not self.is_owner():
             logging.error('Not authorized, bank owned by ' + self.bank['properties']['owner'])
             raise Exception('Not authorized, bank owned by ' + self.bank['properties']['owner'])
@@ -649,6 +673,7 @@ class Bank(object):
         :type release: str
         :return: bool
         '''
+        release = str(release)
         if not self.is_owner():
             logging.error('Not authorized, bank owned by ' + self.bank['properties']['owner'])
             raise Exception('Not authorized, bank owned by ' + self.bank['properties']['owner'])
@@ -683,6 +708,7 @@ class Bank(object):
         :type release: str
         :return: :class:`biomaj.session.Session`
         '''
+        release = str(release)
         oldsession = None
         # Search production release matching release
         for prod in self.bank['production']:
@@ -773,21 +799,43 @@ class Bank(object):
         if os.path.exists(download_files):
             os.remove(download_files)
 
-        if session_release is not None:
-            self.banks.update({'name': self.name}, {'$pull': {
-                'sessions': {'id': sid},
-                'production': {'session': sid}
-            },
-                '$unset': {
-                    'pending.' + session_release: ''
+        local_files = os.path.join(cache_dir, 'local_files_'+str(sid))
+        if os.path.exists(local_files):
+            os.remove(local_files)
+
+        if self.config.get_bool('keep.old.sessions'):
+            logging.debug('keep old sessions')
+            if session_release is not None:
+                self.banks.update({'name': self.name}, {'$pull': {
+                    'production': {'session': sid}
+                },
+                    '$unset': {
+                        'pending.' + session_release: ''
+                    }
+                })
+            else:
+                self.banks.update({'name': self.name}, {'$pull': {
+                    'production': {'session': sid}
                 }
-            })
+                })
+            self.banks.update({'name': self.name, 'sessions.id': sid},
+                              {'$set': {'sessions.$.deleted': time.time()}})
         else:
-            self.banks.update({'name': self.name}, {'$pull': {
-                'sessions': {'id': sid},
-                'production': {'session': sid}
-            }
-            })
+            if session_release is not None:
+                self.banks.update({'name': self.name}, {'$pull': {
+                    'sessions': {'id': sid},
+                    'production': {'session': sid}
+                },
+                    '$unset': {
+                        'pending.' + session_release: ''
+                    }
+                })
+            else:
+                self.banks.update({'name': self.name}, {'$pull': {
+                    'sessions': {'id': sid},
+                    'production': {'session': sid}
+                }
+                })
         # Update object
         self.bank = self.banks.find_one({'name': self.name})
         if session_release is not None:
@@ -853,6 +901,7 @@ class Bank(object):
         :type release: str
         :return: bool
         '''
+        release = str(release)
         logging.warning('Bank:' + self.name + ':RemovePending')
 
         if not self.is_owner():
@@ -889,6 +938,7 @@ class Bank(object):
         :type release: str
         :return: bool
         '''
+        release = str(release)
         logging.warning('Bank:' + self.name + ':Remove')
 
         if not self.is_owner():
@@ -924,6 +974,8 @@ class Bank(object):
         self.session = session
         # Reset status, we take an update session
         res = self.start_remove(session)
+        self.session.set('workflow_status', res)
+
         self.save_session()
 
         return res
@@ -984,6 +1036,7 @@ class Bank(object):
                         #  self.session.reset_proc(Workflow.FLOW_REMOVEPROCESS, proc)
         self.session.set('action', 'update')
         res = self.start_update()
+        self.session.set('workflow_status', res)
         self.save_session()
         return res
 
