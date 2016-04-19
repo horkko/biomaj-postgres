@@ -18,7 +18,8 @@ from biomaj.download.direct import MultiDownload, DirectFTPDownload, DirectHttpD
 from biomaj.download.localcopy import LocalDownload
 from biomaj.download.downloadthreads import DownloadThread
 
-from biomaj.mongo_connector import MongoConnector
+#from biomaj.mongo_connector import MongoConnector
+from biomaj.connector import Connector
 from biomaj.options import Options
 
 from biomaj.process.processfactory import RemoveProcessFactory, PreProcessFactory, PostProcessFactory
@@ -67,6 +68,7 @@ class Workflow(object):
         self.session._session['remove'] = False
         self.session.config.set('localrelease', '')
         self.session.config.set('remoterelease', '')
+        self.connector = Connector().get_connector()
 
     def get_handler(self, protocol, server, remote_dir, list_file=None):
         '''
@@ -180,20 +182,23 @@ class Workflow(object):
                 status[flow['name']] = {'status': None, 'progress': ''}
             else:
                 status[flow['name']] = {'status': None, 'progress': 0}
-        MongoConnector.banks.update({'name': self.name}, {'$set': {'status': status}})
+        #MongoConnector.banks.update({'name': self.name},{'$set': {'status': status}})
+        self.connector().update({'name': self.name}, {'$set': {'status': status}})
 
     def wf_progress_end(self):
         '''
         Reset progress status when workflow is over
         '''
         #MongoConnector.banks.update({'name': self.name},{'$set': {'status': None}})
+        # self.connector().update({'name': self.name},{'$set': {'status': None}})
 
     def wf_progress(self, task, status):
         '''
         Update bank status
         '''
         subtask = 'status.'+task+'.status'
-        MongoConnector.banks.update({'name': self.name}, {'$set': {subtask: status}})
+        #MongoConnector.banks.update({'name': self.name},{'$set': {subtask: status}})
+        self.connector().update({'name': self.name},{'$set': {subtask: status}})
 
     def wf_init(self):
         '''
@@ -407,10 +412,11 @@ class UpdateWorkflow(Workflow):
                 return False
 
             release = self.session.get('release')
-            MongoConnector.banks.update({'name': self.bank.name},
-                                        {'$set': {'status.release.progress': str(release)}})
-
-            logging.info('Workflow:wf_release:FromDepends:'+depbank.name+':'+self.session.get('release'))
+            #MongoConnector.banks.update({'name': self.bank.name},
+            #                            {'$set': {'status.release.progress': str(release)}})
+            self.connector().update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
+          
+	    logging.info('Workflow:wf_release:FromDepends:'+depbank.name+':'+self.session.get('release'))
             if got_update:
                 index = 0
                 # Release directory exits, set index to 1
@@ -519,8 +525,8 @@ class UpdateWorkflow(Workflow):
         self.session.set('release', release)
         self.session.set('remoterelease', release)
 
-        MongoConnector.banks.update({'name': self.bank.name},
-                        {'$set': {'status.release.progress': str(release)}})
+        #MongoConnector.banks.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
+        self.connector().update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
 
         # We restart from scratch, a directory with this release already exists
         # Check directory existence if from scratch to change local release
@@ -853,8 +859,8 @@ class UpdateWorkflow(Workflow):
 
             logging.info('Workflow:wf_download:release:remoterelease:'+self.session.get('remoterelease'))
             logging.info('Workflow:wf_download:release:release:'+release)
-            MongoConnector.banks.update({'name': self.bank.name},
-                            {'$set': {'status.release.progress': str(release)}})
+            #MongoConnector.banks.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
+            self.connector().update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
             self.download_go_ahead = False
             if self.options.get_option(Options.FROM_TASK) == 'download':
                 # We want to download again in same release, that's fine, we do not care it is the same release
@@ -870,9 +876,11 @@ class UpdateWorkflow(Workflow):
 
         self.session.config.set('localrelease', self.session.get('release'))
         self.session.config.set('remoterelease', self.session.get('remoterelease'))
+        # self.banks = MongoConnector.banks
+        # self.bank.bank = self.banks.find_one({'name': self.name})
 
-        self.banks = MongoConnector.banks
-        self.bank.bank = self.banks.find_one({'name': self.name})
+        self.banks = self.connector().get_collection('banks')
+        self.bank.bank = self.connector().get({'name': self.name})
 
         nb_prod_dir = len(self.bank.bank['production'])
         offline_dir = self.session.get_offline_directory()
@@ -929,8 +937,9 @@ class UpdateWorkflow(Workflow):
             # Get last production
             last_production = self.bank.bank['production'][nb_prod_dir-1]
             # Get session corresponding to production directory
-            last_production_session = self.banks.find_one({'name': self.name, 'sessions.id': last_production['session']}, {'sessions.$': 1})
-            last_production_dir = os.path.join(last_production['data_dir'], cf.get('dir.version'), last_production['release'])
+            # last_production_session = self.banks.find_one({'name': self.name, 'sessions.id': last_production['session']},{ 'sessions.$': 1})
+            last_production_session = self.connector().get({'name': self.name, 'sessions.id': last_production['session']},{ 'sessions.$': 1})
+            last_production_dir = os.path.join(last_production['data_dir'],cf.get('dir.version'),last_production['release'])
             # Checks if some files can be copied instead of downloaded
             downloader.download_or_copy(last_production_session['sessions'][0]['files'], last_production_dir)
             if len(downloader.files_to_download) == 0:

@@ -21,6 +21,7 @@ lib64/
 parts/
 sdist/
 var/
+Library/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -49,7 +50,8 @@ coverage.xml
 
 # Django stuff:
 *.log
-
+.ipython
+.viminfo
 # Sphinx documentation
 docs/_build/
 
