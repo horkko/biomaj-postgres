@@ -16,10 +16,7 @@ from biomaj.config import BiomajConfig
 from biomaj.options import Options
 from biomaj.process.processfactory import ProcessFactory
 from biomaj.bmajindex import BmajIndex
-
-
-# from bson.objectid import ObjectId
-
+from biomaj.connector import Connector
 
 class Bank(object):
     '''
@@ -67,13 +64,17 @@ class Bank(object):
         else:
             self.options = options
 
-        if MongoConnector.db is None:
-            MongoConnector(BiomajConfig.global_config.get('GENERAL', 'db.url'),
-                           BiomajConfig.global_config.get('GENERAL', 'db.name'))
+        # if MongoConnector.db is None:
+        #     MongoConnector(BiomajConfig.global_config.get('GENERAL', 'db.url'),
+        #                    BiomajConfig.global_config.get('GENERAL', 'db.name'))
+        #
+        # self.banks = MongoConnector.banks
+        # self.bank = self.banks.find_one({'name': self.name})
 
-        self.banks = MongoConnector.banks
-
-        self.bank = self.banks.find_one({'name': self.name})
+        self.connector = Connector().get_connector()
+        #self.banks = self.connector.get_collection('banks')
+        self.banks = self.connector
+        self.bank = self.connector.get({'name': self.name})
 
         if self.bank is None:
             self.bank = {
@@ -83,7 +84,8 @@ class Bank(object):
                 'production': [],
                 'properties': self.get_properties()
             }
-            self.bank['_id'] = self.banks.insert(self.bank)
+            #self.bank['_id'] = self.banks.insert(self.bank)
+            self.bank['_id'] = self.connector.set('banks', self.bank)
 
         self.session = None
         self.use_last_session = False
@@ -284,6 +286,7 @@ class Bank(object):
             logging.error('Not authorized, bank owned by ' + self.bank['properties']['owner'])
             raise Exception('Not authorized, bank owned by ' + self.bank['properties']['owner'])
 
+        #self.banks.update({'name': self.name}, {'$set': {'properties.owner': owner}})
         self.banks.update({'name': self.name}, {'$set': {'properties.owner': owner}})
 
     def set_visibility(self, visibility):

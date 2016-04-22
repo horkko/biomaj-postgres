@@ -55,6 +55,7 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+config/
 # PyBuilder
 target/
 
@@ -70,5 +71,6 @@ target/
 .emacs*
 .ipython
 .mongo*
+.bash_history
 #*.properties
 

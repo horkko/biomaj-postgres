@@ -9,7 +9,6 @@ import tempfile
 import re
 import traceback
 import json
-import time
 
 from biomaj.utils import Utils
 from biomaj.download.ftp import FTPDownload
@@ -25,9 +24,9 @@ from biomaj.options import Options
 from biomaj.process.processfactory import RemoveProcessFactory, PreProcessFactory, PostProcessFactory
 
 class Workflow(object):
-    '''
+    """
     Bank update workflow
-    '''
+    """
 
     FLOW_INIT = 'init'
     FLOW_CHECK = 'check'
@@ -47,12 +46,12 @@ class Workflow(object):
     ]
 
     def __init__(self, bank, session=None):
-        '''
+        """
         Instantiate a new workflow
 
         :param bank: bank on which to apply the workflow
         :type bank: :class:`biomaj.bank.Bank`
-        '''
+        """
         self.bank = bank
         if session is None:
             self.session = bank.session
@@ -69,6 +68,7 @@ class Workflow(object):
         self.session.config.set('localrelease', '')
         self.session.config.set('remoterelease', '')
         self.connector = Connector().get_connector()
+
 
     def get_handler(self, protocol, server, remote_dir, list_file=None):
         '''
@@ -101,7 +101,6 @@ class Workflow(object):
 
         return downloader
 
-
     def get_flow(self, task):
         for flow in Workflow.FLOW:
             if flow['name'] == task:
@@ -112,7 +111,6 @@ class Workflow(object):
         Start the workflow
         '''
         logging.info('Workflow:Start')
-        #print str(self.session._session['status'])
         for flow in self.session.flow:
             if self.skip_all:
                 logging.info('Workflow:Skip:'+flow['name'])
@@ -134,7 +132,6 @@ class Workflow(object):
                     self.session._session['status'][flow['name']] = False
                     logging.error('Workflow:'+flow['name']+'Exception:'+str(e))
                     logging.debug(traceback.format_exc())
-                    #print str(traceback.format_exc())
                 finally:
                     self.wf_progress(flow['name'], self.session._session['status'][flow['name']])
                 if flow['name'] != Workflow.FLOW_OVER and not self.session.get_status(flow['name']):
@@ -183,14 +180,14 @@ class Workflow(object):
             else:
                 status[flow['name']] = {'status': None, 'progress': 0}
         #MongoConnector.banks.update({'name': self.name},{'$set': {'status': status}})
-        self.connector().update({'name': self.name}, {'$set': {'status': status}})
+        self.connector.update({'name': self.name}, {'$set': {'status': status}})
 
     def wf_progress_end(self):
         '''
         Reset progress status when workflow is over
         '''
         #MongoConnector.banks.update({'name': self.name},{'$set': {'status': None}})
-        # self.connector().update({'name': self.name},{'$set': {'status': None}})
+        # self.connector.update({'name': self.name},{'$set': {'status': None}})
 
     def wf_progress(self, task, status):
         '''
@@ -198,7 +195,7 @@ class Workflow(object):
         '''
         subtask = 'status.'+task+'.status'
         #MongoConnector.banks.update({'name': self.name},{'$set': {subtask: status}})
-        self.connector().update({'name': self.name},{'$set': {subtask: status}})
+        self.connector.update({'name': self.name},{'$set': {subtask: status}})
 
     def wf_init(self):
         '''
@@ -414,7 +411,7 @@ class UpdateWorkflow(Workflow):
             release = self.session.get('release')
             #MongoConnector.banks.update({'name': self.bank.name},
             #                            {'$set': {'status.release.progress': str(release)}})
-            self.connector().update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
+            self.connector.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
           
 	    logging.info('Workflow:wf_release:FromDepends:'+depbank.name+':'+self.session.get('release'))
             if got_update:
@@ -526,7 +523,7 @@ class UpdateWorkflow(Workflow):
         self.session.set('remoterelease', release)
 
         #MongoConnector.banks.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
-        self.connector().update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
+        self.connector.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
 
         # We restart from scratch, a directory with this release already exists
         # Check directory existence if from scratch to change local release
@@ -882,7 +879,7 @@ class UpdateWorkflow(Workflow):
             logging.info('Workflow:wf_download:release:remoterelease:'+self.session.get('remoterelease'))
             logging.info('Workflow:wf_download:release:release:'+release)
             #MongoConnector.banks.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
-            self.connector().update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
+            self.connector.update({'name': self.bank.name},{'$set': {'status.release.progress': str(release)}})
             self.download_go_ahead = False
             if self.options.get_option(Options.FROM_TASK) == 'download':
                 # We want to download again in same release, that's fine, we do not care it is the same release
@@ -901,8 +898,8 @@ class UpdateWorkflow(Workflow):
         # self.banks = MongoConnector.banks
         # self.bank.bank = self.banks.find_one({'name': self.name})
 
-        self.banks = self.connector().get_collection('banks')
-        self.bank.bank = self.connector().get({'name': self.name})
+        self.banks = self.connector.get_collection('banks')
+        self.bank.bank = self.connector.get({'name': self.name}, first=True)
 
         nb_prod_dir = len(self.bank.bank['production'])
         offline_dir = self.session.get_offline_directory()
@@ -960,7 +957,7 @@ class UpdateWorkflow(Workflow):
             last_production = self.bank.bank['production'][nb_prod_dir-1]
             # Get session corresponding to production directory
             # last_production_session = self.banks.find_one({'name': self.name, 'sessions.id': last_production['session']},{ 'sessions.$': 1})
-            last_production_session = self.connector().get({'name': self.name, 'sessions.id': last_production['session']},{ 'sessions.$': 1})
+            last_production_session = self.connector.get({'name': self.name, 'sessions.id': last_production['session']},{ 'sessions.$': 1})
             last_production_dir = os.path.join(last_production['data_dir'],cf.get('dir.version'),last_production['release'])
             # Checks if some files can be copied instead of downloaded
             last_production_files = None

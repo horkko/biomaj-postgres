@@ -1,11 +1,13 @@
 from pymongo import MongoClient
+from biomaj.connector import Connector
 
 __author__ = 'Emmanuel Quevillon <horkko@gmail.com>'
 
-class MongoConnector(object):
-    '''
+
+class MongoConnector(Connector):
+    """
     Connector to mongodb
-    '''
+    """
 
     client = None
     db = None
@@ -37,7 +39,7 @@ class MongoConnector(object):
         """
         MongoConnector.banks.update(query, values)
 
-    def get(self, query, display, first=True):
+    def get(self, query, display={}, first=False):
         """
 
         :param query: Query to apply for the request
