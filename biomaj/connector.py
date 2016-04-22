@@ -1,9 +1,8 @@
-'''
+"""
 Created on Nov 25, 2015
 
 @author: tuco
-'''
-
+"""
 from biomaj.mongo_connector import MongoConnector
 from biomaj.postgres_connector import PostgresConnector
 from biomaj.config import BiomajConfig
@@ -46,9 +45,9 @@ class Connector(object):
         if Connector.url is None or Connector.db is None:
             raise Exception("Can't create connector, params not set!")
         if Connector.driver == 'mongodb':
-            Connector._connector = MongoConnector(Connector.url, Connector.db)
+            Connector._connector = MongoConnector(url=Connector.url, url=Connector.db)
         elif Connector.driver == 'postgres':
-            Connector._connector = PostgresConnector(url=Connector.url, db=Connector.url)
+            Connector._connector = PostgresConnector(url=Connector.url, db=Connector.db)
         return Connector._connector
 
     def update(self, query, values):

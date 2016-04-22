@@ -14,19 +14,24 @@ class MongoConnector(Connector):
     banks = None
     users = None
 
-    def __init__(self, url, db):
+    def __init__(self, url=None, db='biomaj'):
         """
-        Initiate the connector object ot MongoDB
+        Initiate the connector object to MongoDB
 
         :param url: Server connection url
         :type url: str
         :param db: Database name to connect ro
         :type db: str
         """
-        MongoConnector.client = MongoClient(url)
-        MongoConnector.db = MongoConnector.client[db]
-        MongoConnector.banks = MongoConnector.db.banks
-        MongoConnector.users = MongoConnector.db.users
+        self.client = MongoClient(url)
+        self.db = self.client[db]
+        self.banks = self.db.banks
+        self.users = self.db.users
+
+        # MongoConnector.client = MongoClient(url)
+        # MongoConnector.db = MongoConnector.client[db]
+        # MongoConnector.banks = MongoConnector.db.banks
+        # MongoConnector.users = MongoConnector.db.users
 
     def update(self, query, values):
         """
@@ -37,7 +42,7 @@ class MongoConnector(Connector):
         :type values: dict
         :return:
         """
-        MongoConnector.banks.update(query, values)
+        self.banksMongoConnector.banks.update(query, values)
 
     def get(self, query, display={}, first=False):
         """

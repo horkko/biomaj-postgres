@@ -4,7 +4,6 @@ import os
 import logging
 import time
 import shutil
-# import copy
 import json
 
 from datetime import datetime
@@ -72,8 +71,7 @@ class Bank(object):
         # self.bank = self.banks.find_one({'name': self.name})
 
         self.connector = Connector().get_connector()
-        #self.banks = self.connector.get_collection('banks')
-        self.banks = self.connector
+        self.banks = self.connector.banks
         self.bank = self.connector.get({'name': self.name})
 
         if self.bank is None:
