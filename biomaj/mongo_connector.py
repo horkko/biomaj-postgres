@@ -1,18 +1,13 @@
+from biomaj.baseconnector import BaseConnector
 from pymongo import MongoClient
-from biomaj.connector import Connector
 
 __author__ = 'Emmanuel Quevillon <horkko@gmail.com>'
 
 
-class MongoConnector(Connector):
+class MongoConnector(BaseConnector):
     """
     Connector to mongodb
     """
-
-    client = None
-    db = None
-    banks = None
-    users = None
 
     def __init__(self, url=None, db='biomaj'):
         """
@@ -23,15 +18,27 @@ class MongoConnector(Connector):
         :param db: Database name to connect ro
         :type db: str
         """
+        super(BaseConnector, self).__init__()
         self.client = MongoClient(url)
         self.db = self.client[db]
         self.banks = self.db.banks
         self.users = self.db.users
+        self.driver = 'mongodb'
 
-        # MongoConnector.client = MongoClient(url)
-        # MongoConnector.db = MongoConnector.client[db]
-        # MongoConnector.banks = MongoConnector.db.banks
-        # MongoConnector.users = MongoConnector.db.users
+    def get_bank_list(self, visibility='public'):
+        """
+        Get the list of available bank(s)
+
+        :param visibility: Bank visibility type, default 'public'
+        :type visibility: str
+        :return:
+        """
+        if visibility not in ['public', 'private'] and visibility is not None:
+            raise Exception("Visibility '%s' not allowed dude" % visibility)
+        banks = self.get({}, {'name': 1})
+        for bank in banks:
+            self.dislay("Bank %s" % bank['name'])
+
 
     def update(self, query, values):
         """
@@ -42,7 +49,7 @@ class MongoConnector(Connector):
         :type values: dict
         :return:
         """
-        self.banksMongoConnector.banks.update(query, values)
+        self.banks.update(query, values)
 
     def get(self, query, display={}, first=False):
         """
@@ -57,9 +64,9 @@ class MongoConnector(Connector):
         :rtype: dict
         """
         if first:
-            return MongoConnector.banks.find_one(query, display)
+            return self.banks.find_one(query, display)
         else:
-            return MongoConnector.banks.find(query, display)
+            return self.banks.find(query, display)
 
     def get_collection(self, name):
         """
@@ -71,8 +78,8 @@ class MongoConnector(Connector):
         """
         if not name:
             raise Exception("A collection name is required")
-        if name in MongoConnector.__dict__:
-            return MongoConnector.__dict__[name]
+        if name in self.db:
+            return self.db[name]
         return None
 
     def set(self, collection, values):
